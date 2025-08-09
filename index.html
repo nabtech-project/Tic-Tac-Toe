@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic Tac Toe AI - Persistent Scoreboard</title>
+<style>
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: linear-gradient(135deg, #2c3e50, #3498db);
+        color: white;
+        min-height: 100vh;
+        padding: 20px;
+    }
+    h1 {
+        margin-top: 10px;
+        font-size: 2em;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+    }
+    #scoreboard {
+        margin-top: 10px;
+        font-size: 1.2em;
+        background: rgba(255,255,255,0.15);
+        padding: 10px 20px;
+        border-radius: 10px;
+        display: flex;
+        gap: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    #board {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(80px, 100px));
+        grid-template-rows: repeat(3, minmax(80px, 100px));
+        gap: 8px;
+        margin: 20px auto;
+    }
+    .cell {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 2.5em;
+        font-weight: bold;
+        cursor: pointer;
+        color: white;
+        transition: transform 0.2s, background 0.3s;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .cell:hover {
+        transform: scale(1.05);
+        background: rgba(255,255,255,0.25);
+    }
+    #controls {
+        margin-top: 10px;
+        margin-bottom: 12px;
+    }
+    button {
+        padding: 10px 20px;
+        font-size: 1em;
+        background: #ff9800;
+        border: none;
+        color: white;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.3s;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    button:hover {
+        background: #e68900;
+    }
+    #resetScores {
+        background: #666;
+        margin-left: 10px;
+    }
+    #resetScores:hover {
+        background: #222;
+    }
+    @media (max-width: 500px) {
+        #board {
+            grid-template-columns: repeat(3, 80px);
+            grid-template-rows: repeat(3, 80px);
+            gap: 6px;
+        }
+        .cell {
+            font-size: 2em;
+        }
+    }
+</style>
+</head>
+<body>
+
+<h1>Tic Tac Toe - AI</h1>
+
+<div id="scoreboard">
+    <div>😊 Player Wins: <span id="playerScore">0</span></div>
+    <div>🤖 AI Wins: <span id="aiScore">0</span></div>
+    <div>🤝 Draws: <span id="drawScore">0</span></div>
+</div>
+
+<div id="board"></div>
+
+<div id="controls">
+    <button onclick="startNewGame()">🔄 Restart Game</button>
+    <button id="resetScores" onclick="resetScores()">🗑️ Reset Scores</button>
+</div>
+
+<script>
+let board = Array(9).fill("");
+let player = "X";
+let ai = "O";
+let playerTurn = true;
+
+// -------- Persistent scoreboard load --------
+let playerScore = parseInt(localStorage.getItem("playerScore")) || 0;
+let aiScore = parseInt(localStorage.getItem("aiScore")) || 0;
+let drawScore = parseInt(localStorage.getItem("drawScore")) || 0;
+
+const winCombos = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+];
+
+const boardDiv = document.getElementById("board");
+for (let i=0;i<9;i++) {
+    let cell = document.createElement("div");
+    cell.classList.add("cell");
+    cell.dataset.index = i;
+    cell.addEventListener("click", () => playerMove(i));
+    boardDiv.appendChild(cell);
+}
+
+function startNewGame() {
+    board = Array(9).fill("");
+    document.querySelectorAll(".cell").forEach(c => {
+        c.textContent = "";
+        c.style.color = "white";
+    });
+    let goFirst = confirm("Do you want to go first? OK → You  |  Cancel → AI");
+    playerTurn = goFirst;
+    if (!playerTurn) setTimeout(aiMove, 400);
+}
+
+function playerMove(index) {
+    if (board[index] === "" && playerTurn) {
+        board[index] = player;
+        updateBoard();
+        if (checkGameOver()) return;
+        playerTurn = false;
+        setTimeout(aiMove, 400);
+    }
+}
+
+function aiMove() {
+    let bestScore = -Infinity;
+    let move;
+    for (let i=0;i<9;i++) {
+        if (board[i] === "") {
+            board[i] = ai;
+            let score = minimax(board, false);
+            board[i] = "";
+            if (score > bestScore) {
+                bestScore = score;
+                move = i;
+            }
+        }
+    }
+    if (move !== undefined) {
+        board[move] = ai;
+        updateBoard();
+    }
+    if (checkGameOver()) return;
+    playerTurn = true;
+}
+
+function minimax(newBoard, isMaximizing) {
+    if (checkWin(ai)) return 1;
+    if (checkWin(player)) return -1;
+    if (isFull()) return 0;
+
+    if (isMaximizing) {
+        let bestScore = -Infinity;
+        for (let i=0;i<9;i++) {
+            if (newBoard[i] === "") {
+                newBoard[i] = ai;
+                let score = minimax(newBoard, false);
+                newBoard[i] = "";
+                bestScore = Math.max(score, bestScore);
+            }
+        }
+        return bestScore;
+    } else {
+        let bestScore = Infinity;
+        for (let i=0;i<9;i++) {
+            if (newBoard[i] === "") {
+                newBoard[i] = player;
+                let score = minimax(newBoard, true);
+                newBoard[i] = "";
+                bestScore = Math.min(score, bestScore);
+            }
+        }
+        return bestScore;
+    }
+}
+
+function updateBoard() {
+    document.querySelectorAll(".cell").forEach((c, i) => {
+        c.textContent = board[i];
+        if (board[i] === player) {
+            c.style.color = "#4CAF50"; // Player color
+        } else if (board[i] === ai) {
+            c.style.color = "#FF5252"; // AI color
+        } else {
+            c.style.color = "white";
+        }
+    });
+}
+
+function checkWin(p) {
+    return winCombos.some(combo => combo.every(i => board[i] === p));
+}
+
+function isFull() {
+    return board.every(cell => cell !== "");
+}
+
+function checkGameOver() {
+    if (checkWin(player)) {
+        setTimeout(() => {
+            alert("🎉 You Win!");
+            playerScore++;
+            updateScoreboard();
+            saveScores();
+            startNewGame();
+        }, 150);
+        return true;
+    } else if (checkWin(ai)) {
+        setTimeout(() => {
+            alert("🤖 AI Wins!");
+            aiScore++;
+            updateScoreboard();
+            saveScores();
+            startNewGame();
+        }, 150);
+        return true;
+    } else if (isFull()) {
+        setTimeout(() => {
+            alert("🤝 It's a draw!");
+            drawScore++;
+            updateScoreboard();
+            saveScores();
+            startNewGame();
+        }, 150);
+        return true;
+    }
+    return false;
+}
+
+function updateScoreboard() {
+    document.getElementById("playerScore").textContent = playerScore;
+    document.getElementById("aiScore").textContent = aiScore;
+    document.getElementById("drawScore").textContent = drawScore;
+}
+
+function saveScores() {
+    localStorage.setItem("playerScore", playerScore);
+    localStorage.setItem("aiScore", aiScore);
+    localStorage.setItem("drawScore", drawScore);
+}
+
+function resetScores() {
+    if (confirm("Reset all scores?")) {
+        playerScore = 0; aiScore = 0; drawScore = 0;
+        saveScores();
+        updateScoreboard();
+    }
+}
+
+// ------- Display saved scores on load
+updateScoreboard();
+
+// ------- Start first game
+startNewGame();
+</script>
+
+</body>
+</html>
